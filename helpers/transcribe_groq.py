@@ -163,6 +163,22 @@ def _convert(raw: dict, offset: float = 0.0) -> tuple[list[dict], list[dict]]:
     return words, segments
 
 
+def _monotonic(words: list[dict]) -> list[dict]:
+    """Keep Whisper's word order (it follows the spoken text) and repair overlaps.
+
+    At segment joins Whisper can give a word an early start that overlaps the
+    previous words (e.g. "But" stamped 32.52-34.44 while "experience" runs
+    32.66-33.48). Sorting by start would put it in the wrong place; instead the
+    start is clamped to the previous word's end.
+    """
+    out: list[dict] = []
+    for w in words:
+        if out and w["start"] < out[-1]["end"]:
+            w["start"] = min(out[-1]["end"], w["end"])
+        out.append(w)
+    return out
+
+
 def _with_spacing(words: list[dict]) -> list[dict]:
     out: list[dict] = []
     for i, w in enumerate(words):
@@ -208,7 +224,7 @@ def transcribe_wav(wav: Path, api_key: str, language: str | None = None) -> dict
                 segments += [x for x in s if lo <= x["start"] < hi]
                 start += chunk_s
 
-    words.sort(key=lambda x: x["start"])
+    words = _monotonic(words)
     return {
         "provider": "groq",
         "model": env_value("GROQ_MODEL", DEFAULT_MODEL),
