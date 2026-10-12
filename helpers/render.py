@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -55,6 +56,9 @@ SUB_FORCE_STYLE = (
     "BorderStyle=1,Outline=2,Shadow=0,"
     "Alignment=2,MarginV=90"
 )
+# Brand overrides: a full force_style string, and a folder of .ttf files libass can load.
+SUB_FORCE_STYLE = os.environ.get("VIDEO_USE_SUB_STYLE") or SUB_FORCE_STYLE
+SUB_FONTS_DIR = os.environ.get("VIDEO_USE_FONTS_DIR", "")
 
 # -------- Helpers ------------------------------------------------------------
 
@@ -674,9 +678,13 @@ def build_final_composite(
 
     # Subtitles LAST — Rule 1
     if has_subs:
-        subs_abs = str(subtitles_path.resolve()).replace(":", r"\:").replace("'", r"\'")
+        subs_abs = subtitles_path.resolve().as_posix().replace(":", r"\:").replace("'", r"\'")
+        fonts_opt = ""
+        if SUB_FONTS_DIR:
+            fonts_abs = Path(SUB_FONTS_DIR).resolve().as_posix().replace(":", r"\:").replace("'", r"\'")
+            fonts_opt = f":fontsdir='{fonts_abs}'"
         filter_parts.append(
-            f"{current}subtitles='{subs_abs}':force_style='{SUB_FORCE_STYLE}'[outv]"
+            f"{current}subtitles='{subs_abs}'{fonts_opt}:force_style='{SUB_FORCE_STYLE}'[outv]"
         )
         out_label = "[outv]"
     else:
