@@ -33,7 +33,16 @@ import requests
 SCRIBE_URL = "https://api.elevenlabs.io/v1/speech-to-text"
 
 
+def provider() -> str:
+    """TRANSCRIBE_PROVIDER=groq|elevenlabs (env or repo .env). Default: elevenlabs."""
+    import transcribe_groq
+    return transcribe_groq.env_value("TRANSCRIBE_PROVIDER", "elevenlabs").lower()
+
+
 def load_api_key() -> str:
+    if provider() == "groq":
+        import transcribe_groq
+        return transcribe_groq.load_groq_key()
     for candidate in [Path(__file__).resolve().parent.parent / ".env", Path(".env")]:
         if candidate.exists():
             for line in candidate.read_text().splitlines():
@@ -175,7 +184,11 @@ def transcribe_one(
         size_mb = audio.stat().st_size / (1024 * 1024)
         if verbose:
             print(f"  uploading {video.stem}.wav ({size_mb:.1f} MB)", flush=True)
-        payload = call_scribe(audio, api_key, language, num_speakers)
+        if provider() == "groq":
+            import transcribe_groq
+            payload = transcribe_groq.transcribe_wav(audio, api_key, language)
+        else:
+            payload = call_scribe(audio, api_key, language, num_speakers)
 
     out_path.write_text(json.dumps(payload, indent=2))
     dt = time.time() - t0
